@@ -1,0 +1,19 @@
+{
+  "storage_version": 1,
+  "name": "bp-wifi-adapter",
+  "friendly_name": "bp-wifi-adapter",
+  "comment": null,
+  "esphome_version": null,
+  "src_version": 1,
+  "address": "bp-wifi-adapter.local",
+  "web_port": null,
+  "esp_platform": "UNKNOWN",
+  "build_path": "None",
+  "firmware_bin_path": "None",
+  "loaded_integrations": [],
+  "loaded_platforms": [],
+  "no_mdns": false,
+  "framework": null,
+  "core_platform": "unknown",
+  "toolchain": null
+}

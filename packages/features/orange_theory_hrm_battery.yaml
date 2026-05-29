@@ -61,9 +61,6 @@ sensor:
                   id: *sample_complete
                   value: '1'
 
-              # Disconnect after a read.
-              - ble_client.disconnect: ${device_id}_ble_client
-
 
   # This is the stable value shown in Home Assistant.
   - platform: template
@@ -100,26 +97,31 @@ script:
             - script.execute: *try_battery_read
             - wait_until:
                 condition:
-                  lambda: return id(${device_id}_sample_complete);
+                  lambda: &ret_sample_complete return id(${device_id}_sample_complete);
                 timeout: 20s
+            - ble_client.disconnect: *ble_client
+            # Print a debug message
+            - if:
+                condition: 
+                  lambda: *ret_sample_complete
+                then:
+                  # Successful sample
+                  - logger.log:
+                      format: Sample Complete
+                      level: INFO
+                else:
+                  # Sample timeout
+                  - logger.log:
+                      format: Sample Timeout
+                      level: INFO
+                  - ble_client.disconnect: *ble_client
+
+            # Turn the scan back on
             - script.execute: bt_scan_on
             - script.wait: bt_scan_on
-            - if:
-                condition:
-                  lambda: return id(${device_id}_sample_complete);
-                then:
-                  # the sample is complete. Try again in 5m
-                  - wait_until:
-                      condition:
-                        binary_sensor.is_off: *presence
-                      timeout: 5min
-                else:
-                  # the sample timed out. Try again in 30s
-                  - logger.log: 
-                      format: "Timeout for ${device_id}"
-                      level: INFO
-                  - wait_until:
-                      condition:
-                        binary_sensor.is_off: *presence
-                      timeout: 30s
 
+            - wait_until:
+                condition:
+                  binary_sensor.is_off: *presence
+                timeout: !lambda |-
+                    return id(${device_id}_sample_complete) ? 5*60*1000 : 1*30*1000;

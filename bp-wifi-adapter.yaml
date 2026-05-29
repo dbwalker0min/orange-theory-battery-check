@@ -1,0 +1,51 @@
+
+substitutions:
+  name: "bp-wifi-adapter"
+  slug: "bp_wifi_adapter"
+  friendly_name: "Blood Pressure-WiFi Adapter"
+  version: "0.0.1"
+
+  # Bluetooth MAC address of the blood pressure monitor (must be set by user)
+  bp_monitor_mac: "FF:FF:11:1D:7B:8F"
+  bp_monitor_service_uuid: "fff0"
+  bp_monitor_characteristic_uuid: "fff1"
+
+  # MAC addresses of orange theory monitors
+  orange_theory_hrms:
+    david: 
+      mac: "CA:FD:29:F3:B5:B0"
+      friendly_name: "David OTF HRM"
+    julia: 
+      mac: "CA:FD:29:F3:A5:0B"
+      friendly_name: "Julia OTF HRM"
+
+  # get secrets from secrets.yaml
+  wifi_ssid: !secret wifi_ssid
+  wifi_password: !secret wifi_password
+  api_key: !secret api_key
+  ap_password: !secret ap_password
+
+packages:
+  # Standard-ish ESPHome components for all devices
+  board: !include ../packages/boards/esp32_s3_devkit.yaml
+
+  hrm: !include ../packages/features/orange_theory_hrm.yaml
+  david_orange_theory_hrm: !include 
+    file: ../packages/features/orange_theory_hrm_battery.yaml
+    vars:
+      device_id: david_ot_hrm
+      mac_address: ${orange_theory_hrms.david.mac}
+      friendly_name: ${orange_theory_hrms.david.friendly_name}
+  julia_orange_theory_hrm: !include 
+    file: ../packages/features/orange_theory_hrm_battery.yaml
+    vars:
+      device_id: julia_ot_hrm
+      mac_address: ${orange_theory_hrms.julia.mac}
+      friendly_name: ${orange_theory_hrms.julia.friendly_name}
+  base: !include ../packages/base/base.yaml
+  diagnostics: !include ../packages/base/diagnostics.yaml
+
+  features: !include ../packages/features/bluetooth.yaml
+
+  # This must be last because it contains debug components that should be overridden by other packages if needed
+  debug: !include ../packages/base/debug.yaml
