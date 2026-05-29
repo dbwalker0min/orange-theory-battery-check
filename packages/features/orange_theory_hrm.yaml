@@ -1,0 +1,37 @@
+# This handles connections to OTF HRMs
+
+globals:
+  - id: bluetooth_scan_off_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+script:
+  # This turns bluetooth scanning off
+  - id: bt_scan_off
+    mode: queued
+    then:
+      - logger.log: "Turning bluetooth scan off"
+      - if:
+          condition:
+            # Check for count == 0 and increment
+            lambda: return id(bluetooth_scan_off_count)++ == 0;
+          then:
+            - delay: 100ms
+            - esp32_ble_tracker.stop_scan:
+
+  # This turns bluetooth scanning back on
+  - id: bt_scan_on
+    mode: queued
+    then: 
+      - logger.log: "Turning bluetooth scan on"
+      - if:
+          condition:
+            lambda: |-
+              // Decrement scan count if not zero
+              if (id(bluetooth_scan_off_count) > 0) id(bluetooth_scan_off_count)--;
+
+              // If the scan count is zero, then reenable the scan
+              return id(bluetooth_scan_off_count) == 0;
+          then:
+            - esp32_ble_tracker.start_scan:

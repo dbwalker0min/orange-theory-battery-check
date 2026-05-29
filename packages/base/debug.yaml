@@ -6,5 +6,5 @@ web_server:
 
 # Make sure the logging level is debug
 logger:
-  level: DEBUG
+  level: INFO
 

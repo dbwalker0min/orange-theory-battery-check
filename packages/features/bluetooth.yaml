@@ -1,5 +1,5 @@
 esp32_ble_tracker:
-
+  id: ble_tracker
 
 ble_client:
   - mac_address: "${bp_monitor_mac}"

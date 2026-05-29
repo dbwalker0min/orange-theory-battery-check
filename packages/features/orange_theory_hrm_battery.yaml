@@ -1,0 +1,125 @@
+# packages/orange_theory_hrm_battery.yaml
+
+substitutions:
+  battery_service_uuid: '180f'
+  battery_characteristic_uuid: '2a19'
+
+globals:
+  # This boolean gets set when the sample is complete
+  - id: &sample_complete ${device_id}_sample_complete
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+ble_client:
+  - mac_address: ${mac_address}
+    id: &ble_client ${device_id}_ble_client
+    auto_connect: false
+    on_connect:
+      then:
+        - logger.log: 
+            format: "Connection successful to ${device_id}"
+            level: INFO
+        - component.update: ${device_id}_battery_raw
+
+binary_sensor:
+  - platform: ble_presence
+    mac_address: ${mac_address}
+    id: &presence ${device_id}_presence
+    name: "${friendly_name} Present"
+    timeout: 1min
+    on_press:
+      then:
+        - logger.log:
+            format: "Presence detected ${device_id}"
+            level: INFO
+        - script.execute: ${device_id}_read_loop
+
+sensor:
+  # This is the actual BLE characteristic reader.
+  # It will go unavailable when disconnected, so keep it internal.
+  - platform: ble_client
+    type: characteristic
+    id: ${device_id}_battery_raw
+    ble_client_id: *ble_client
+    service_uuid: ${battery_service_uuid}
+    characteristic_uuid: ${battery_characteristic_uuid}
+    update_interval: never
+    internal: true
+    on_raw_value:
+      then:
+        # Copy the value to a stable dashboard-facing template sensor.
+        - if:
+            condition:
+                lambda: return !std::isnan(x) && !id(${device_id}_sample_complete);
+            then:
+              - lambda: |-
+                  ESP_LOGI("SensorRaw", "Sensor value %f", x);
+                  id(${device_id}_battery).publish_state(x);
+                  
+              - globals.set:
+                  id: *sample_complete
+                  value: '1'
+
+              # Disconnect after a read.
+              - ble_client.disconnect: ${device_id}_ble_client
+
+
+  # This is the stable value shown in Home Assistant.
+  - platform: template
+    id: ${device_id}_battery
+    name: "${friendly_name} Battery"
+    icon: mdi:battery
+    device_class: battery
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    update_interval: never
+
+script:
+  - id: &try_battery_read ${device_id}_try_battery_read
+    mode: single
+    then:
+      - ble_client.connect: ${device_id}_ble_client
+
+  - id: ${device_id}_read_loop
+    mode: single
+    then:
+      - while:
+          condition:
+            binary_sensor.is_on: *presence
+          then:
+            - script.execute: bt_scan_off
+            - script.wait: bt_scan_off
+
+            - logger.log:
+                format: "Trying to read battery from ${device_id}"
+                level: INFO
+            - globals.set:
+                id: *sample_complete
+                value: '0'
+            - script.execute: *try_battery_read
+            - wait_until:
+                condition:
+                  lambda: return id(${device_id}_sample_complete);
+                timeout: 20s
+            - script.execute: bt_scan_on
+            - script.wait: bt_scan_on
+            - if:
+                condition:
+                  lambda: return id(${device_id}_sample_complete);
+                then:
+                  # the sample is complete. Try again in 5m
+                  - wait_until:
+                      condition:
+                        binary_sensor.is_off: *presence
+                      timeout: 5min
+                else:
+                  # the sample timed out. Try again in 30s
+                  - logger.log: 
+                      format: "Timeout for ${device_id}"
+                      level: INFO
+                  - wait_until:
+                      condition:
+                        binary_sensor.is_off: *presence
+                      timeout: 30s
+
